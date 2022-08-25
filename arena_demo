@@ -1,0 +1,169 @@
+from arena import *
+import random
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# variables
+
+button_scale = (0.5, 0.1, 0.5)
+
+app_position = (0,0,0)  
+app_rotation = (0,0,0)
+box_scaler = (0.3,0.3,0.3)
+app_scale = (1,1,1)
+start_walk = 0
+material = Material(opacity=0, transparent=True)
+x=[]
+y=[]
+z=[]
+
+
+walk = Text(
+    object_id="walk_txt",
+    position=(0, 3, 0),
+    text="start walking!",
+    color="#555555",
+    ttl = 5
+)
+
+start_txt = Text(
+    object_id="start_txt",
+    position=(0, 2, 0),
+    text="Find Apriltag and click on 'find it box'!",
+    color="#555555",
+    persist=True,
+)
+
+
+def finish_handler(scene,evt,msg):
+    global start_walk,x,y,z
+    if evt.type == "mousedown":
+        start_walk = 0
+        ax = plt.axes(projection ='3d')
+        ax.plot3D(x, y, z, 'green')
+        plt.show()
+        scene.delete_object(finish)
+        scene.delete_object(finish_box)
+
+find = Text(
+    object_id="find",
+    position=(0, 1, 0),
+    text="find it!",
+    color="#555555",
+    persist=True,      
+)
+finish = Text(
+    object_id="finish",
+    position=(0, 1, 0),
+    text="finish!",
+    color="#555555",
+    persist=True,      
+)
+finish_box = Box(
+    object_id="finish_box",
+    position=(0, 0, 0),
+    scale=box_scaler,
+    clickable=True,
+    color="#555555",
+    persist=True,
+    evt_handler=finish_handler
+)
+
+def findtag_handler(scene,evt,msg):
+    global start_walk
+    if evt.type == "mousedown":
+        walk = Text(
+            object_id="walk_txt",
+            position=(0, 3, 0),
+            text="start walking!",
+            color="#555555",
+            ttl = 5
+        )
+        start_walk = 1
+        scene.delete_object(start_txt)
+        scene.delete_object(find)
+        scene.delete_object(find_box)
+        scene.add_object(walk)
+        scene.add_object(finish)
+        scene.add_object(finish_box)
+
+
+
+
+find_box = Box(
+    object_id="find_box",
+    position=(0, 0, 0),
+    scale=box_scaler,
+    clickable=True,
+    color="#555555",
+    persist=True,
+    evt_handler=findtag_handler
+)
+
+
+
+def draw_text(msg,txt_id):
+    arm_start_txt = Text(
+    object_id=txt_id,
+    position=(0, 0.75, 1.5),
+    text=msg,
+    color="#555555",
+    persist=True,
+    )
+    scene.add_object(arm_start_txt)
+
+
+class CameraState(Object):
+    def __init__(self, camera):
+        self.camera = camera
+        self.prev_pos = None
+        self.line_color = Color(
+                random.randint(0,255),
+                random.randint(0,255),
+                random.randint(0,255)
+            )
+
+    @property
+    def curr_pos(self):
+        return self.camera.data.position
+
+    @property
+    def displacement(self):
+        if self.prev_pos:
+            return self.prev_pos.distance_to(self.curr_pos)
+        else:
+            return 0
+
+cam_states = []
+
+def user_join_callback(scene, cam, msg):
+    global cam_states
+
+    cam_state = CameraState(cam)
+    cam_states += [cam_state]
+
+scene = Scene(host="mqtt.arenaxr.org", scene="test")
+scene.user_join_callback = user_join_callback
+
+@scene.run_forever(interval_ms=200)
+def line_follow():
+    if start_walk == 1:
+        for cam_state in cam_states:
+            print(cam_state.curr_pos)
+            x.append(cam_state.curr_pos['x'])
+            y.append(-cam_state.curr_pos['z'])
+            z.append(cam_state.curr_pos['y'])
+            
+            cam_state.prev_pos = cam_state.curr_pos
+
+@scene.run_once
+def main():
+    scene.add_object(start_txt)
+    scene.add_object(find)
+    scene.add_object(find_box)
+
+
+scene.run_tasks() 
+
