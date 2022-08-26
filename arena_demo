@@ -1,20 +1,18 @@
+
 from arena import *
 import random
 
 
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 # variables
-
-button_scale = (0.5, 0.1, 0.5)
-
-app_position = (0,0,0)  
-app_rotation = (0,0,0)
 box_scaler = (0.3,0.3,0.3)
-app_scale = (1,1,1)
+text_scaler = (0.3,0.3,0.3)
 start_walk = 0
-material = Material(opacity=0, transparent=True)
+
+# record walk's position
 x=[]
 y=[]
 z=[]
@@ -22,7 +20,7 @@ z=[]
 
 walk = Text(
     object_id="walk_txt",
-    position=(0, 3, 0),
+    position=(0, 1.2, 0),
     text="start walking!",
     color="#555555",
     ttl = 5
@@ -30,89 +28,89 @@ walk = Text(
 
 start_txt = Text(
     object_id="start_txt",
-    position=(0, 2, 0),
-    text="Find Apriltag and click on 'find it box'!",
+    position=(0, 1.2, 0),
+    text="Find Apriltag and click on 'find it' green tab!",
+    scale=text_scaler,
     color="#555555",
-    persist=True,
+    persist=True
 )
 
+def plot_walker_track():
+    ax = plt.axes(projection ='3d')
+    ax.plot3D(x, y, z, 'green')
+    ax.set_xlim(0,5)
+    ax.set_ylim(5,0)
+    ax.set_zlim(0,5)
+    plt.show()
 
 def finish_handler(scene,evt,msg):
     global start_walk,x,y,z
     if evt.type == "mousedown":
         start_walk = 0
-        ax = plt.axes(projection ='3d')
-        ax.plot3D(x, y, z, 'green')
-        plt.show()
-        scene.delete_object(finish)
-        scene.delete_object(finish_box)
+        plot_walker_track()     # walker's track will show 
+                                # and other objects will be deleted
+        scene.delete_object(finish_text)
+        scene.delete_object(finish_box) # finish this program
 
-find = Text(
+find_text = Text(
     object_id="find",
     position=(0, 1, 0),
     text="find it!",
     color="#555555",
+    scale = text_scaler,
     persist=True,      
 )
-finish = Text(
+finish_text = Text(
     object_id="finish",
-    position=(0, 1, 0),
+    position=(0, 1.2, 0),
     text="finish!",
     color="#555555",
+    scale = text_scaler,
     persist=True,      
 )
 finish_box = Box(
     object_id="finish_box",
-    position=(0, 0, 0),
-    scale=box_scaler,
+    position=(0, 1, 0),
+    scale=(0.1,0.1,0.01),
     clickable=True,
-    color="#555555",
+    color=(0, 255, 0),
     persist=True,
     evt_handler=finish_handler
+)
+
+walk = Text(
+    object_id="walk_txt",
+    position=(0, 1.2, 0),
+    text="start walking!",
+    color="#555555",
+    scale = text_scaler,
+    ttl = 3
 )
 
 def findtag_handler(scene,evt,msg):
     global start_walk
     if evt.type == "mousedown":
-        walk = Text(
-            object_id="walk_txt",
-            position=(0, 3, 0),
-            text="start walking!",
-            color="#555555",
-            ttl = 5
-        )
+        # after finding April tag, tell user to walk
         start_walk = 1
         scene.delete_object(start_txt)
-        scene.delete_object(find)
+        scene.delete_object(find_text)
         scene.delete_object(find_box)
         scene.add_object(walk)
-        scene.add_object(finish)
+        time.sleep(3)
+        scene.add_object(finish_text)
         scene.add_object(finish_box)
-
-
 
 
 find_box = Box(
     object_id="find_box",
-    position=(0, 0, 0),
-    scale=box_scaler,
+    position=(0, 0.8, 0),
+    scale=(0.1,0.1,0.01),
     clickable=True,
-    color="#555555",
+    color=(0, 255, 0),
     persist=True,
     evt_handler=findtag_handler
 )
 
-
-
-def draw_text(msg,txt_id):
-    arm_start_txt = Text(
-    object_id=txt_id,
-    position=(0, 0.75, 1.5),
-    text=msg,
-    color="#555555",
-    persist=True,
-    )
-    scene.add_object(arm_start_txt)
 
 
 class CameraState(Object):
@@ -123,7 +121,7 @@ class CameraState(Object):
                 random.randint(0,255),
                 random.randint(0,255),
                 random.randint(0,255)
-            )
+            ) # not used
 
     @property
     def curr_pos(self):
@@ -144,11 +142,13 @@ def user_join_callback(scene, cam, msg):
     cam_state = CameraState(cam)
     cam_states += [cam_state]
 
+# scene name should match the scene you build
 scene = Scene(host="mqtt.arenaxr.org", scene="test")
 scene.user_join_callback = user_join_callback
 
+# if user start to walk then record the location
 @scene.run_forever(interval_ms=200)
-def line_follow():
+def track_camera():
     if start_walk == 1:
         for cam_state in cam_states:
             print(cam_state.curr_pos)
@@ -161,7 +161,7 @@ def line_follow():
 @scene.run_once
 def main():
     scene.add_object(start_txt)
-    scene.add_object(find)
+    scene.add_object(find_text)
     scene.add_object(find_box)
 
 
